@@ -31,12 +31,17 @@ uv run scripts/query_gemini.py --prompt "describe this image" --image "path/to/i
 
 Provide via `--api-key` argument or set `GRSAI_API_KEY` environment variable.
 
-## Common Failures
+## Troubleshooting
 
-- `Error: No API key provided.` → set `GRSAI_API_KEY` or pass `--api-key`
-- `Error: Image not found:` → wrong path or unreadable file
-- HTTP 401 → wrong or expired API key
-- `Unexpected response format` → API error; check prompt for policy violations
+| Symptom | Resolution |
+|---------|------------|
+| `Error: No API key provided.` | Set `GRSAI_API_KEY` env var or pass `--api-key` |
+| `Error: Image not found:` | Wrong path or unreadable file; verify the path exists |
+| HTTP 401 | Wrong or expired API key |
+| `Unexpected response format` | API error; check prompt for policy violations |
+| `uv: command not found` | Install: `curl -LsSf https://astral.sh/uv/install.sh \| sh`, then restart terminal |
+
+For transient errors (HTTP 429, network timeouts), the script retries automatically up to 3 times. If retries are exhausted, surface the error to the user.
 
 ## Output
 

@@ -45,12 +45,17 @@ Map user requests:
 
 Provide via `--api-key` argument or set `GRSAI_API_KEY` environment variable.
 
-## Common Failures
+## Troubleshooting
 
-- `Error: No API key provided.` → set `GRSAI_API_KEY` or pass `--api-key`
-- HTTP 401 → wrong or expired API key
-- `Generation failed:` → content moderation or invalid input; rephrase prompt
-- Timeout → use a faster model or shorter duration
+| Symptom | Resolution |
+|---------|------------|
+| `Error: No API key provided.` | Set `GRSAI_API_KEY` env var or pass `--api-key` |
+| HTTP 401 | Wrong or expired API key |
+| `Generation failed:` | Content moderation or invalid input; rephrase prompt |
+| Timeout | Use a faster model (`veo3.1-fast`) or shorter duration (`--duration 4`) |
+| `uv: command not found` | Install: `curl -LsSf https://astral.sh/uv/install.sh \| sh`, then restart terminal |
+
+For transient errors (HTTP 429, network timeouts), retry once after 30 seconds. Do not retry more than twice — surface the issue to the user instead.
 
 ## Filename Convention
 

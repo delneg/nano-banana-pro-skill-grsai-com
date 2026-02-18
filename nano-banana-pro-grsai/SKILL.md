@@ -58,18 +58,17 @@ The script checks for API key in this order:
 
 If neither is available, the script exits with an error message.
 
-## Preflight + Common Failures (fast fixes)
+## Troubleshooting
 
-- Preflight:
-  - `command -v uv` (must exist)
-  - `test -n "$GRSAI_API_KEY"` (or pass `--api-key`)
-  - If editing: `test -f "path/to/input.png"`
+| Symptom | Resolution |
+|---------|------------|
+| `Error: No API key provided.` | Set `GRSAI_API_KEY` env var or pass `--api-key` |
+| `Error: Input image not found:` | Wrong path or unreadable file; verify with `test -f "path"` |
+| HTTP 401 | Wrong or expired API key |
+| `Generation failed:` | Content moderation or invalid input; rephrase prompt |
+| `uv: command not found` | Install: `curl -LsSf https://astral.sh/uv/install.sh \| sh`, then restart terminal |
 
-- Common failures:
-  - `Error: No API key provided.` → set `GRSAI_API_KEY` or pass `--api-key`
-  - `Error loading input image:` → wrong path / unreadable file
-  - HTTP 401 → wrong or expired API key
-  - `Generation failed:` → content moderation or invalid input; rephrase prompt
+For transient errors (network timeouts, server errors), the script retries automatically with exponential backoff. If all retries fail, surface the error to the user.
 
 ## Filename Generation
 
