@@ -25,11 +25,12 @@ from pathlib import Path
 GRSAI_API_URL = "https://grsaiapi.com/v1/draw/nano-banana"
 GRSAI_RESULT_URL = "https://grsaiapi.com/v1/draw/result"
 
-# Fallback model chain: try each in order on failure
+# Fallback model chain: try each in order on failure (pro variants only, cheapest first)
 FALLBACK_MODELS = [
     "nano-banana-pro",
-    "nano-banana",
-    "nano-banana-fast",
+    "nano-banana-pro-vt",
+    "nano-banana-pro-cl",
+    "nano-banana-pro-vip",
 ]
 
 # Errors that indicate a transient failure — worth retrying
