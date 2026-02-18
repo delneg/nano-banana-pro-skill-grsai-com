@@ -28,7 +28,9 @@ REQUEST_TIMEOUT = 120   # seconds — Gemini can be slow on long tasks
 MAX_RETRIES = 3
 RETRY_DELAY = 4.0
 
-TRANSIENT_STATUS_CODES = {429, 500, 502, 503, 504}
+
+class TransientError(RuntimeError):
+    """Raised for transient errors that are worth retrying (rate limits, server errors, timeouts)."""
 
 
 def get_api_key(provided_key: str | None) -> str | None:
@@ -56,21 +58,14 @@ def http_post(url: str, data: dict, api_key: str) -> dict:
         if e.code == 401:
             raise RuntimeError(f"Unauthorized (HTTP 401): check your API key. Details: {body_text}")
         if e.code == 429:
-            raise RuntimeError(f"rate limit|HTTP 429: too many requests. Details: {body_text}")
+            raise TransientError(f"HTTP 429: too many requests. Details: {body_text}")
         if e.code >= 500:
-            raise RuntimeError(f"server error|HTTP {e.code}: {body_text}")
+            raise TransientError(f"HTTP {e.code}: {body_text}")
         raise RuntimeError(f"HTTP {e.code}: {body_text}")
     except urllib.error.URLError as e:
-        raise RuntimeError(f"network error|Could not connect to {url}: {e.reason}")
+        raise TransientError(f"Could not connect to {url}: {e.reason}")
     except TimeoutError:
-        raise RuntimeError(f"timeout|Request timed out after {REQUEST_TIMEOUT}s")
-
-
-def is_retryable(msg: str) -> bool:
-    """Return True if the error is transient and worth retrying."""
-    msg_lower = msg.lower()
-    retryable_markers = ("rate limit", "server error", "network error", "timeout", "502", "503", "504", "overload")
-    return any(m in msg_lower for m in retryable_markers)
+        raise TransientError(f"Request timed out after {REQUEST_TIMEOUT}s")
 
 
 def query_with_retry(payload: dict, api_key: str) -> dict:
@@ -81,17 +76,14 @@ def query_with_retry(payload: dict, api_key: str) -> dict:
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             return http_post(GRSAI_CHAT_URL, payload, api_key)
-        except RuntimeError as e:
-            msg = str(e)
+        except TransientError as e:
             last_error = e
-            if not is_retryable(msg):
-                raise  # Permanent error, don't retry
             if attempt < MAX_RETRIES:
-                # Strip internal marker prefix before printing
-                display_msg = msg.split("|", 1)[-1] if "|" in msg else msg
-                print(f"Attempt {attempt} failed (will retry in {delay:.0f}s): {display_msg}", file=sys.stderr)
+                print(f"Attempt {attempt} failed (will retry in {delay:.0f}s): {e}", file=sys.stderr)
                 time.sleep(delay)
                 delay = min(delay * 2, 30)
+        except RuntimeError:
+            raise  # Permanent error, don't retry
 
     raise last_error
 
@@ -167,9 +159,8 @@ def main():
 
     try:
         response = query_with_retry(payload, api_key)
-    except RuntimeError as e:
-        msg = str(e).split("|", 1)[-1] if "|" in str(e) else str(e)
-        print(f"\nRequest failed: {msg}", file=sys.stderr)
+    except (RuntimeError, TransientError) as e:
+        print(f"\nRequest failed: {e}", file=sys.stderr)
         sys.exit(1)
 
     choices = response.get("choices")

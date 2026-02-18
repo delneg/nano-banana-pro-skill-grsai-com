@@ -35,7 +35,6 @@ AVAILABLE_MODELS = [
 PERMANENT_KEYWORDS = ("moderation", "nsfw", "invalid", "unauthorized", "forbidden", "not exist")
 TRANSIENT_KEYWORDS = ("timeout", "network", "connection", "unavailable", "overload", "retry", "rate limit", "too many")
 
-CONNECT_TIMEOUT = 15   # seconds to establish connection
 READ_TIMEOUT = 45      # seconds to wait for API response
 DOWNLOAD_TIMEOUT = 300 # seconds to download the video (large files)
 POLL_INTERVAL = 5.0    # seconds between status polls
@@ -80,11 +79,6 @@ def http_post(url: str, data: dict, api_key: str) -> dict:
 def is_permanent_error(msg: str) -> bool:
     msg_lower = msg.lower()
     return any(kw in msg_lower for kw in PERMANENT_KEYWORDS)
-
-
-def is_transient_error(msg: str) -> bool:
-    msg_lower = msg.lower()
-    return any(kw in msg_lower for kw in TRANSIENT_KEYWORDS)
 
 
 def submit_task(payload: dict, api_key: str) -> str:
