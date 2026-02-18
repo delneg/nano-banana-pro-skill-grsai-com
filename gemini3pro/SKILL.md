@@ -11,12 +11,12 @@ Run from the user's current working directory (do NOT cd into the skill director
 
 **Text generation:**
 ```bash
-uv run ~/.codex/skills/gemini3pro/scripts/query_gemini.py --prompt "your question" [--system-prompt "instructions"] [--output "response.md"] [--api-key KEY]
+uv run scripts/query_gemini.py --prompt "your question" [--system-prompt "instructions"] [--output "response.md"] [--api-key KEY]
 ```
 
 **Image analysis (vision):**
 ```bash
-uv run ~/.codex/skills/gemini3pro/scripts/query_gemini.py --prompt "describe this image" --image "path/to/image.png" [--output "analysis.md"] [--api-key KEY]
+uv run scripts/query_gemini.py --prompt "describe this image" --image "path/to/image.png" [--output "analysis.md"] [--api-key KEY]
 ```
 
 ## Parameters
@@ -45,9 +45,9 @@ Print the response to stdout. Optionally save to file with `--output`. Do not pi
 ## Examples
 
 ```bash
-uv run ~/.codex/skills/gemini3pro/scripts/query_gemini.py --prompt "Explain the difference between TCP and UDP in simple terms"
+uv run scripts/query_gemini.py --prompt "Explain the difference between TCP and UDP in simple terms"
 ```
 
 ```bash
-uv run ~/.codex/skills/gemini3pro/scripts/query_gemini.py --prompt "What objects are in this image?" --image "photo.jpg" --output "analysis.md"
+uv run scripts/query_gemini.py --prompt "What objects are in this image?" --image "photo.jpg" --output "analysis.md"
 ```
