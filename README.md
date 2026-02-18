@@ -6,9 +6,9 @@ Agent skills for [grsai.com](https://grsai.com) — AI image generation, video g
 
 | Skill | Description |
 |-------|-------------|
-| [nano-banana-pro-grsai](plugins/nano-banana-pro-grsai/SKILL.md) | Generate or edit images (text-to-image, image-to-image; 1K/2K/4K) |
-| [veo3-1](plugins/veo3-1/SKILL.md) | Generate videos with Google Veo 3.1 (720p/1080p/4K; 4/6/8s; 16:9 or 9:16) |
-| [gemini3pro](plugins/gemini3pro/SKILL.md) | Text generation and image analysis via Google Gemini 3 Pro |
+| [nano-banana-pro-grsai](plugins/grsai-com-nano-banana-veo3-1-gemini3/skills/nano-banana-pro-grsai/SKILL.md) | Generate or edit images (text-to-image, image-to-image; 1K/2K/4K) |
+| [veo3-1](plugins/grsai-com-nano-banana-veo3-1-gemini3/skills/veo3-1/SKILL.md) | Generate videos with Google Veo 3.1 (720p/1080p/4K; 4/6/8s; 16:9 or 9:16) |
+| [gemini3pro](plugins/grsai-com-nano-banana-veo3-1-gemini3/skills/gemini3pro/SKILL.md) | Text generation and image analysis via Google Gemini 3 Pro |
 
 ## Requirements
 
@@ -21,27 +21,25 @@ Agent skills for [grsai.com](https://grsai.com) — AI image generation, video g
 
 ```bash
 claude plugin marketplace add delneg/nano-banana-pro-skill-grsai-com
-claude plugin install nano-banana-pro-grsai
-claude plugin install veo3-1
-claude plugin install gemini3pro
+claude plugin install grsai-com-nano-banana-veo3-1-gemini3
 ```
 
 ### Manual (any agent)
 
-Copy the skill folders from `plugins/` to your agent's skills directory:
+Copy the skills from `plugins/grsai-com-nano-banana-veo3-1-gemini3/skills/` to your agent's skills directory:
 
 ```bash
 # Claude Code
-cp -r plugins/* ~/.claude/skills/
+cp -r plugins/grsai-com-nano-banana-veo3-1-gemini3/skills/* ~/.claude/skills/
 
 # Codex
-cp -r plugins/* ~/.codex/skills/
+cp -r plugins/grsai-com-nano-banana-veo3-1-gemini3/skills/* ~/.codex/skills/
 
 # OpenCode
-cp -r plugins/* ~/.config/opencode/skill/
+cp -r plugins/grsai-com-nano-banana-veo3-1-gemini3/skills/* ~/.config/opencode/skill/
 
 # Cursor
-cp -r plugins/* ~/.cursor/skills/
+cp -r plugins/grsai-com-nano-banana-veo3-1-gemini3/skills/* ~/.cursor/skills/
 ```
 
 ### Cursor
@@ -57,15 +55,19 @@ Skills are auto-discovered — the agent uses them automatically when your reque
 ```
 nano-banana-pro-skill-grsai-com/
 └── plugins/
-    ├── nano-banana-pro-grsai/
-    │   ├── SKILL.md
-    │   └── scripts/generate_image.py
-    ├── veo3-1/
-    │   ├── SKILL.md
-    │   └── scripts/generate_video.py
-    └── gemini3pro/
-        ├── SKILL.md
-        └── scripts/query_gemini.py
+    └── grsai-com-nano-banana-veo3-1-gemini3/
+        ├── .claude-plugin/
+        │   └── plugin.json
+        └── skills/
+            ├── nano-banana-pro-grsai/
+            │   ├── SKILL.md
+            │   └── scripts/generate_image.py
+            ├── veo3-1/
+            │   ├── SKILL.md
+            │   └── scripts/generate_video.py
+            └── gemini3pro/
+                ├── SKILL.md
+                └── scripts/query_gemini.py
 ```
 
 ## License
