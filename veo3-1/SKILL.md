@@ -1,5 +1,5 @@
 ---
-name: veo3.1
+name: veo3-1
 description: Generate videos with Google Veo 3.1 via grsai.com API. Use for any video creation, text-to-video, or motion content requests. Triggers on "generate video", "create a clip", "make a video of", "video of", "animate". Supports fast/pro quality tiers; 720p/1080p/4K; 4/6/8-second durations; 16:9 and 9:16 aspect ratios.
 ---
 
@@ -10,7 +10,7 @@ description: Generate videos with Google Veo 3.1 via grsai.com API. Use for any 
 Run from the user's current working directory (do NOT cd into the skill directory):
 
 ```bash
-uv run ~/.codex/skills/veo3.1/scripts/generate_video.py --prompt "description" --filename "output.mp4" [--model MODEL] [--duration 4|6|8] [--aspect-ratio 16:9|9:16] [--api-key KEY]
+uv run ~/.codex/skills/veo3-1/scripts/generate_video.py --prompt "description" --filename "output.mp4" [--model MODEL] [--duration 4|6|8] [--aspect-ratio 16:9|9:16] [--api-key KEY]
 ```
 
 ## Workflow (draft → final)
@@ -66,9 +66,9 @@ Save to current directory. Report the saved path to the user. Do not open or rea
 ## Examples
 
 ```bash
-uv run ~/.codex/skills/veo3.1/scripts/generate_video.py --prompt "A golden sunset over mountain peaks with birds flying" --filename "2025-11-23-14-23-05-sunset-draft.mp4" --model veo3.1-fast --duration 4
+uv run ~/.codex/skills/veo3-1/scripts/generate_video.py --prompt "A golden sunset over mountain peaks with birds flying" --filename "2025-11-23-14-23-05-sunset-draft.mp4" --model veo3.1-fast --duration 4
 ```
 
 ```bash
-uv run ~/.codex/skills/veo3.1/scripts/generate_video.py --prompt "Close-up of waves crashing on rocky shore, slow motion, cinematic" --filename "2025-11-23-15-30-12-ocean-waves.mp4" --model veo3.1-pro-4k --duration 8 --aspect-ratio 16:9
+uv run ~/.codex/skills/veo3-1/scripts/generate_video.py --prompt "Close-up of waves crashing on rocky shore, slow motion, cinematic" --filename "2025-11-23-15-30-12-ocean-waves.mp4" --model veo3.1-pro-4k --duration 8 --aspect-ratio 16:9
 ```
