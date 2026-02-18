@@ -1,11 +1,11 @@
 ---
 name: nano-banana-pro
-description: Generate/edit images with Nano Banana Pro (Gemini 3 Pro Image). Use for image create/modify requests incl. edits. Supports text-to-image + image-to-image; 1K/2K/4K; use --input-image.
+description: Generate/edit images with Nano Banana Pro via grsai.com API. Use for image create/modify requests incl. edits. Supports text-to-image + image-to-image; 1K/2K/4K; use --input-image.
 ---
 
 # Nano Banana Pro Image Generation & Editing
 
-Generate new images or edit existing ones using Google's Nano Banana Pro API (Gemini 3 Pro Image).
+Generate new images or edit existing ones using the grsai.com Nano Banana Pro API.
 
 ## Usage
 
@@ -30,13 +30,11 @@ Goal: fast iteration without burning time on 4K until the prompt is correct.
 - Draft (1K): quick feedback loop
   - `uv run ~/.codex/skills/nano-banana-pro/scripts/generate_image.py --prompt "<draft prompt>" --filename "yyyy-mm-dd-hh-mm-ss-draft.png" --resolution 1K`
 - Iterate: adjust prompt in small diffs; keep filename new per run
-  - If editing: keep the same `--input-image` for every iteration until you’re happy.
+  - If editing: keep the same `--input-image` for every iteration until you're happy.
 - Final (4K): only when prompt is locked
   - `uv run ~/.codex/skills/nano-banana-pro/scripts/generate_image.py --prompt "<final prompt>" --filename "yyyy-mm-dd-hh-mm-ss-final.png" --resolution 4K`
 
 ## Resolution Options
-
-The Gemini 3 Pro Image API supports three resolutions (uppercase K required):
 
 - **1K** (default) - ~1024px resolution
 - **2K** - ~2048px resolution
@@ -48,11 +46,15 @@ Map user requests to API parameters:
 - "2K", "2048", "normal", "medium resolution" → `2K`
 - "high resolution", "high-res", "hi-res", "4K", "ultra" → `4K`
 
+## Aspect Ratio Options
+
+Pass via `--aspect-ratio`. Supported values: `auto` (default), `1:1`, `16:9`, `9:16`, `4:3`, `3:4`, `3:2`, `2:3`, `5:4`, `4:5`, `21:9`
+
 ## API Key
 
 The script checks for API key in this order:
 1. `--api-key` argument (use if user provided key in chat)
-2. `GEMINI_API_KEY` environment variable
+2. `GRSAI_API_KEY` environment variable
 
 If neither is available, the script exits with an error message.
 
@@ -60,13 +62,14 @@ If neither is available, the script exits with an error message.
 
 - Preflight:
   - `command -v uv` (must exist)
-  - `test -n \"$GEMINI_API_KEY\"` (or pass `--api-key`)
-  - If editing: `test -f \"path/to/input.png\"`
+  - `test -n "$GRSAI_API_KEY"` (or pass `--api-key`)
+  - If editing: `test -f "path/to/input.png"`
 
 - Common failures:
-  - `Error: No API key provided.` → set `GEMINI_API_KEY` or pass `--api-key`
-  - `Error loading input image:` → wrong path / unreadable file; verify `--input-image` points to a real image
-  - “quota/permission/403” style API errors → wrong key, no access, or quota exceeded; try a different key/account
+  - `Error: No API key provided.` → set `GRSAI_API_KEY` or pass `--api-key`
+  - `Error loading input image:` → wrong path / unreadable file
+  - HTTP 401 → wrong or expired API key
+  - `Generation failed:` → content moderation or invalid input; rephrase prompt
 
 ## Filename Generation
 
@@ -106,14 +109,14 @@ Preserve user's creative intent in both cases.
 Use templates when the user is vague or when edits must be precise.
 
 - Generation template:
-  - “Create an image of: <subject>. Style: <style>. Composition: <camera/shot>. Lighting: <lighting>. Background: <background>. Color palette: <palette>. Avoid: <list>.”
+  - "Create an image of: <subject>. Style: <style>. Composition: <camera/shot>. Lighting: <lighting>. Background: <background>. Color palette: <palette>. Avoid: <list>."
 
 - Editing template (preserve everything else):
-  - “Change ONLY: <single change>. Keep identical: subject, composition/crop, pose, lighting, color palette, background, text, and overall style. Do not add new objects. If text exists, keep it unchanged.”
+  - "Change ONLY: <single change>. Keep identical: subject, composition/crop, pose, lighting, color palette, background, text, and overall style. Do not add new objects. If text exists, keep it unchanged."
 
 ## Output
 
-- Saves PNG to current directory (or specified path if filename includes directory)
+- Saves image to current directory (or specified path if filename includes directory)
 - Script outputs the full path to the generated image
 - **Do not read the image back** - just inform the user of the saved path
 
