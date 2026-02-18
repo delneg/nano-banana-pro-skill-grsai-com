@@ -33,6 +33,13 @@ AVAILABLE_MODELS = [
 ]
 
 PERMANENT_KEYWORDS = ("moderation", "nsfw", "invalid", "unauthorized", "forbidden", "not exist")
+TRANSIENT_KEYWORDS = ("timeout", "network", "connection", "unavailable", "overload", "retry", "rate limit", "too many")
+
+CONNECT_TIMEOUT = 15   # seconds to establish connection
+READ_TIMEOUT = 45      # seconds to wait for API response
+DOWNLOAD_TIMEOUT = 300 # seconds to download the video (large files)
+POLL_INTERVAL = 5.0    # seconds between status polls
+POLL_TIMEOUT = 600     # max seconds to wait for generation to complete
 
 
 def get_api_key(provided_key: str | None) -> str | None:
@@ -52,8 +59,22 @@ def http_post(url: str, data: dict, api_key: str) -> dict:
         },
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req, timeout=READ_TIMEOUT) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        body_text = e.read().decode("utf-8", errors="replace")
+        if e.code == 401:
+            raise RuntimeError(f"Unauthorized (HTTP 401): check your API key. Details: {body_text}")
+        if e.code == 429:
+            raise RuntimeError(f"Rate limited (HTTP 429): too many requests. Details: {body_text}")
+        if e.code >= 500:
+            raise RuntimeError(f"Server error (HTTP {e.code}): {body_text}")
+        raise RuntimeError(f"HTTP {e.code}: {body_text}")
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"Network error connecting to {url}: {e.reason}")
+    except TimeoutError:
+        raise TimeoutError(f"Request to {url} timed out after {READ_TIMEOUT}s")
 
 
 def is_permanent_error(msg: str) -> bool:
@@ -61,22 +82,30 @@ def is_permanent_error(msg: str) -> bool:
     return any(kw in msg_lower for kw in PERMANENT_KEYWORDS)
 
 
+def is_transient_error(msg: str) -> bool:
+    msg_lower = msg.lower()
+    return any(kw in msg_lower for kw in TRANSIENT_KEYWORDS)
+
+
 def submit_task(payload: dict, api_key: str) -> str:
     """Submit a generation task, return task_id."""
     response = http_post(GRSAI_VIDEO_URL, payload, api_key)
     if response.get("code") != 0:
-        raise RuntimeError(response.get("msg", "Unknown error"))
-    return response["data"]["id"]
+        raise RuntimeError(response.get("msg", "Unknown error from API"))
+    task_id = response.get("data", {}).get("id")
+    if not task_id:
+        raise RuntimeError(f"No task ID in response: {response}")
+    return task_id
 
 
-def poll_result(task_id: str, api_key: str, poll_interval: float = 5.0, timeout: int = 600) -> dict:
+def poll_result(task_id: str, api_key: str) -> dict:
     """Poll for task result until succeeded, failed, or timeout."""
-    deadline = time.time() + timeout
+    deadline = time.time() + POLL_TIMEOUT
     while time.time() < deadline:
         result = http_post(GRSAI_RESULT_URL, {"id": task_id}, api_key)
         if result.get("code") != 0:
             raise RuntimeError(f"Result API error: {result.get('msg')}")
-        data = result["data"]
+        data = result.get("data", {})
         status = data.get("status")
         progress = data.get("progress", 0)
         print(f"  Progress: {progress}% ({status})")
@@ -84,15 +113,15 @@ def poll_result(task_id: str, api_key: str, poll_interval: float = 5.0, timeout:
             return data
         if status == "failed":
             reason = (data.get("failure_reason", "") + " " + data.get("error", "")).strip()
-            raise RuntimeError(reason or "unknown failure")
-        time.sleep(poll_interval)
-    raise TimeoutError(f"Generation timed out after {timeout}s")
+            raise RuntimeError(reason or "Generation failed with unknown reason")
+        time.sleep(POLL_INTERVAL)
+    raise TimeoutError(f"Generation timed out after {POLL_TIMEOUT}s (task: {task_id})")
 
 
 def try_generate(payload: dict, api_key: str, max_retries: int = 3) -> dict:
     """Try to generate with retries on transient errors."""
     delay = 5.0
-    last_error: Exception = RuntimeError("no attempts made")
+    last_error: Exception = RuntimeError("No attempts made")
 
     for attempt in range(1, max_retries + 1):
         try:
@@ -110,7 +139,7 @@ def try_generate(payload: dict, api_key: str, max_retries: int = 3) -> dict:
             msg = str(e)
             last_error = e
             if is_permanent_error(msg):
-                print(f"Permanent error (will not retry): {msg}")
+                print(f"Permanent error — stopping: {msg}")
                 raise
             print(f"Attempt {attempt} failed: {msg}")
 
@@ -120,6 +149,32 @@ def try_generate(payload: dict, api_key: str, max_retries: int = 3) -> dict:
             delay = min(delay * 2, 60)
 
     raise last_error
+
+
+def download_video(url: str, output_path: Path) -> None:
+    """Download video from URL to file, with progress indication."""
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "grsai-veo-skill/1.0"})
+        with urllib.request.urlopen(req, timeout=DOWNLOAD_TIMEOUT) as resp:
+            total = int(resp.headers.get("Content-Length", 0))
+            downloaded = 0
+            chunks = []
+            chunk_size = 1024 * 64  # 64 KB
+            while True:
+                chunk = resp.read(chunk_size)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                downloaded += len(chunk)
+                if total:
+                    pct = downloaded * 100 // total
+                    print(f"  Downloading: {pct}% ({downloaded // 1024} KB)", end="\r")
+            print()
+            output_path.write_bytes(b"".join(chunks))
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"Network error downloading video: {e.reason}")
+    except TimeoutError:
+        raise RuntimeError(f"Video download timed out after {DOWNLOAD_TIMEOUT}s")
 
 
 def main():
@@ -154,9 +209,7 @@ def main():
     api_key = get_api_key(args.api_key)
     if not api_key:
         print("Error: No API key provided.", file=sys.stderr)
-        print("Please either:", file=sys.stderr)
-        print("  1. Provide --api-key argument", file=sys.stderr)
-        print("  2. Set GRSAI_API_KEY environment variable", file=sys.stderr)
+        print("Set GRSAI_API_KEY environment variable or pass --api-key", file=sys.stderr)
         sys.exit(1)
 
     output_path = Path(args.filename)
@@ -171,24 +224,39 @@ def main():
     }
 
     print(f"Generating video — model={args.model}, duration={args.duration}s, aspect={args.aspect_ratio}")
+    print(f"Prompt: {args.prompt[:100]}{'...' if len(args.prompt) > 100 else ''}")
 
     try:
         result = try_generate(payload, api_key)
-    except (RuntimeError, TimeoutError) as e:
-        print(f"Generation failed: {e}", file=sys.stderr)
+    except RuntimeError as e:
+        print(f"\nGeneration failed: {e}", file=sys.stderr)
+        sys.exit(1)
+    except TimeoutError as e:
+        print(f"\nGeneration timed out: {e}", file=sys.stderr)
         sys.exit(1)
 
-    video_url = result["results"][0]["url"]
+    # Veo returns url at top-level; nano-banana uses results[0].url — handle both
+    video_url = result.get("url")
+    if not video_url:
+        nested = result.get("results", [])
+        if nested:
+            video_url = nested[0].get("url")
+    if not video_url:
+        print(f"Error: No video URL in result: {result}", file=sys.stderr)
+        sys.exit(1)
 
-    print("Downloading video...")
+    credits = result.get("credits_cost", "unknown")
+    print(f"Generation complete! Credits used: {credits}")
+    print(f"Downloading video from: {video_url[:80]}...")
+
     try:
-        with urllib.request.urlopen(video_url, timeout=180) as resp:
-            output_path.write_bytes(resp.read())
-    except Exception as e:
-        print(f"Error downloading video: {e}", file=sys.stderr)
+        download_video(video_url, output_path)
+    except RuntimeError as e:
+        print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"\nVideo saved: {output_path.resolve()}")
+    size_kb = output_path.stat().st_size // 1024
+    print(f"\nVideo saved: {output_path.resolve()} ({size_kb} KB)")
 
 
 if __name__ == "__main__":

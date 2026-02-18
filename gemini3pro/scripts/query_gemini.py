@@ -15,6 +15,7 @@ import base64
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -22,6 +23,12 @@ from pathlib import Path
 
 GRSAI_CHAT_URL = "https://grsaiapi.com/v1/chat/completions"
 MODEL = "gemini-3-pro"
+
+REQUEST_TIMEOUT = 120   # seconds — Gemini can be slow on long tasks
+MAX_RETRIES = 3
+RETRY_DELAY = 4.0
+
+TRANSIENT_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
 def get_api_key(provided_key: str | None) -> str | None:
@@ -41,8 +48,80 @@ def http_post(url: str, data: dict, api_key: str) -> dict:
         },
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=120) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        body_text = e.read().decode("utf-8", errors="replace")
+        if e.code == 401:
+            raise RuntimeError(f"Unauthorized (HTTP 401): check your API key. Details: {body_text}")
+        if e.code == 429:
+            raise RuntimeError(f"rate limit|HTTP 429: too many requests. Details: {body_text}")
+        if e.code >= 500:
+            raise RuntimeError(f"server error|HTTP {e.code}: {body_text}")
+        raise RuntimeError(f"HTTP {e.code}: {body_text}")
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"network error|Could not connect to {url}: {e.reason}")
+    except TimeoutError:
+        raise RuntimeError(f"timeout|Request timed out after {REQUEST_TIMEOUT}s")
+
+
+def is_retryable(msg: str) -> bool:
+    """Return True if the error is transient and worth retrying."""
+    msg_lower = msg.lower()
+    retryable_markers = ("rate limit", "server error", "network error", "timeout", "502", "503", "504", "overload")
+    return any(m in msg_lower for m in retryable_markers)
+
+
+def query_with_retry(payload: dict, api_key: str) -> dict:
+    """Call the API with exponential backoff retry on transient errors."""
+    delay = RETRY_DELAY
+    last_error: Exception = RuntimeError("No attempts made")
+
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            return http_post(GRSAI_CHAT_URL, payload, api_key)
+        except RuntimeError as e:
+            msg = str(e)
+            last_error = e
+            if not is_retryable(msg):
+                raise  # Permanent error, don't retry
+            if attempt < MAX_RETRIES:
+                # Strip internal marker prefix before printing
+                display_msg = msg.split("|", 1)[-1] if "|" in msg else msg
+                print(f"Attempt {attempt} failed (will retry in {delay:.0f}s): {display_msg}", file=sys.stderr)
+                time.sleep(delay)
+                delay = min(delay * 2, 30)
+
+    raise last_error
+
+
+def load_image_as_base64(image_path: str) -> tuple[str, str]:
+    """Load image file and return (mime_type, base64_data)."""
+    path = Path(image_path)
+    if not path.exists():
+        print(f"Error: Image not found: {image_path}", file=sys.stderr)
+        sys.exit(1)
+    if not path.is_file():
+        print(f"Error: Not a file: {image_path}", file=sys.stderr)
+        sys.exit(1)
+
+    ext = path.suffix.lower().lstrip(".")
+    mime_map = {"jpg": "jpeg", "jpeg": "jpeg", "png": "png", "webp": "webp", "gif": "gif"}
+    mime = mime_map.get(ext)
+    if not mime:
+        print(f"Error: Unsupported image format '{ext}'. Use jpg, png, webp, or gif.", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        img_data = path.read_bytes()
+    except OSError as e:
+        print(f"Error reading image: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    size_kb = len(img_data) // 1024
+    print(f"Loaded image: {image_path} ({size_kb} KB, {ext.upper()})")
+    return f"image/{mime}", base64.b64encode(img_data).decode("utf-8")
 
 
 def main():
@@ -60,26 +139,16 @@ def main():
     api_key = get_api_key(args.api_key)
     if not api_key:
         print("Error: No API key provided.", file=sys.stderr)
-        print("Please either:", file=sys.stderr)
-        print("  1. Provide --api-key argument", file=sys.stderr)
-        print("  2. Set GRSAI_API_KEY environment variable", file=sys.stderr)
+        print("Set GRSAI_API_KEY environment variable or pass --api-key", file=sys.stderr)
         sys.exit(1)
 
     # Build message content
     if args.image:
-        image_path = Path(args.image)
-        if not image_path.exists():
-            print(f"Error: Image not found: {args.image}", file=sys.stderr)
-            sys.exit(1)
-        img_data = image_path.read_bytes()
-        ext = image_path.suffix.lower().lstrip(".")
-        mime = {"jpg": "jpeg", "jpeg": "jpeg", "png": "png", "webp": "webp", "gif": "gif"}.get(ext, "jpeg")
-        b64 = base64.b64encode(img_data).decode("utf-8")
+        mime_type, b64_data = load_image_as_base64(args.image)
         content = [
             {"type": "text", "text": args.prompt},
-            {"type": "image_url", "image_url": {"url": f"data:image/{mime};base64,{b64}"}},
+            {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{b64_data}"}},
         ]
-        print(f"Loaded image: {args.image}")
     else:
         content = args.prompt
 
@@ -94,23 +163,30 @@ def main():
     }
 
     mode = "vision" if args.image else "text"
-    print(f"Querying Gemini 3 Pro ({mode})...")
+    print(f"Querying {MODEL} ({mode})...")
 
     try:
-        response = http_post(GRSAI_CHAT_URL, payload, api_key)
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")
-        print(f"HTTP {e.code} error: {body}", file=sys.stderr)
-        sys.exit(1)
-    except Exception as e:
-        print(f"Request failed: {e}", file=sys.stderr)
+        response = query_with_retry(payload, api_key)
+    except RuntimeError as e:
+        msg = str(e).split("|", 1)[-1] if "|" in str(e) else str(e)
+        print(f"\nRequest failed: {msg}", file=sys.stderr)
         sys.exit(1)
 
-    if "choices" not in response or not response["choices"]:
-        print(f"Unexpected response format: {response}", file=sys.stderr)
+    choices = response.get("choices")
+    if not choices:
+        print(f"Error: Unexpected response format — no 'choices' field: {response}", file=sys.stderr)
         sys.exit(1)
 
-    text = response["choices"][0]["message"]["content"]
+    message = choices[0].get("message", {})
+    text = message.get("content")
+    if text is None:
+        print(f"Error: No content in response message: {message}", file=sys.stderr)
+        sys.exit(1)
+
+    usage = response.get("usage", {})
+    if usage:
+        total_tokens = usage.get("total_tokens", "?")
+        print(f"Tokens used: {total_tokens}")
 
     print("\n" + "=" * 60)
     print(text)
