@@ -258,7 +258,7 @@ def main():
 
     print("Downloading image...")
     try:
-        with urllib.request.urlopen(image_url, timeout=60) as resp:
+        with urllib.request.urlopen(image_url, timeout=60 * 2) as resp:
             output_path.write_bytes(resp.read())
     except Exception as e:
         print(f"Error downloading image: {e}", file=sys.stderr)
