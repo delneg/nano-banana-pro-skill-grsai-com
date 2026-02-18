@@ -1,0 +1,11 @@
+{
+  "name": "grsai-com-nano-banana-veo3-1-gemini3",
+  "version": "1.0.0",
+  "description": "Skills for generating images, videos and text using Nano Banana, Veo3.1 and Gemini 3 via grsai.com API",
+  "author": {
+    "name": "delneg",
+    "email": "onlydelneg@gmail.com"
+  },
+  "repository": "https://github.com/delneg/nano-banana-pro-skill-grsai-com",
+  "license": "MIT"
+}

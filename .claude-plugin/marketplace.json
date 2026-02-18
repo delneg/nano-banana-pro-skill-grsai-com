@@ -5,29 +5,15 @@
     "email": "onlydelneg@gmail.com"
   },
   "metadata": {
-    "description": "Plugins for generating images, videos and text using Nano Banana, Veo3.1 and Gemini 3 via grsai.com API"
+    "description": "Skills for generating images, videos and text using Nano Banana, Veo3.1 and Gemini 3 via grsai.com API"
   },
   "plugins": [
     {
-      "name": "gemini3pro",
+      "name": "grsai-com-nano-banana-veo3-1-gemini3",
       "source": {
-        "source": "plugins/gemini3pro"
+        "source": "plugins/grsai-com-nano-banana-veo3-1-gemini3"
       },
-      "description": "Skill for using Gemini 3 Pro via grsai.com API"
-    },
-    {
-      "name": "nano-banana-pro-grsai",
-      "source": {
-        "source": "plugins/nano-banana-pro-grsai"
-      },
-      "description": "Skill for generating images with Nano Banana Pro via grsai.com API"
-    },
-    {
-      "name": "veo3-1",
-      "source": {
-        "source": "plugins/veo3-1"
-      },
-      "description": "Skill for generating videos with Veo3.1 via grsai.com API"
+      "description": "Skill for using Gemini 3 Pro, Nano Banana Pro and Veo3.1 via grsai.com API"
     }
   ]
 }
